@@ -1,0 +1,150 @@
+#!/bin/bash
+
+### INIT ###
+BOOK="./book"
+
+if [ ! -f $BOOK ]
+then
+	touch $BOOK
+	chmod u+rw $BOOK
+fi
+
+if [ ! -r $BOOK ]
+then
+	echo "ERR: $BOOK not readable"
+	exit 1
+fi
+
+if [ ! -w $BOOK ]
+then
+	echo "ERR: $BOOK not writable"
+	exit 2
+fi
+
+
+
+### Functions ###
+function ListContacts() {
+	column -t -N NAME,PHONE,EMAIL -s ':' $BOOK
+}
+
+function SearchContacts() {
+	local FILTER
+	local NUMBER_OF_MATCHES
+
+	read -p "FILTER: " FILTER
+	NUMBER_OF_MATCHES=$(grep -ci $FILTER $BOOK)
+	echo "$NUMBER_OF_MATCHES" coincidences found
+
+	if [ $NUMBER_OF_MATCHES -ge 1 ]
+	then
+		grep -i $FILTER $BOOK | column -t -N NAME,PHONE,EMAIL -s ':' 
+	fi
+}
+
+function IsRepeated() {
+	echo
+}
+
+function AddContact() {
+	local NAME
+	local PHONE
+	local EMAIL
+
+	read -p "Name: " NAME
+	read -p "Phone: " PHONE
+	read -p "Email: " EMAIL
+	echo "$NAME:$PHONE:$EMAIL" >> $BOOK
+	sort $BOOK -o $BOOK
+
+}
+
+function EditContact() {
+	local FIELD
+	local NEW_FIELD
+	local FILTER
+	local NUMBER_OF_MATCHES
+	local NUMBER_OF_LINE_TO_EDIT
+	local NUMBER_OF_FIELDS
+
+	read -p "FILTER: " FILTER
+	NUMBER_OF_MATCHES=$(grep -ci $FILTER $BOOK)
+
+	if [ $NUMBER_OF_MATCHES -ge 2 ]
+	then
+		grep -ni $FILTER $BOOK | column -t -N ID,NAME,PHONE,EMAIL -s ':'
+		read -p "Select ID of contact: " NUMBER_OF_LINE_TO_EDIT
+	elif [ $NUMBER_OF_MATCHES -eq 1 ]
+	then
+		NUMBER_OF_LINE_TO_EDIT=$(grep -ni $FILTER $BOOK | cut -d ':' -f 1)
+	else
+		echo "No matches found"
+		return 1
+	fi
+
+	NUMBER_OF_FIELDS=$(sed -n "${NUMBER_OF_LINE_TO_EDIT}p" $BOOK| awk -F ":" "{print NF}")
+	for ((i = 1; i <= $NUMBER_OF_FIELDS; i++))
+	do
+		FIELD=$(sed -n "${NUMBER_OF_LINE_TO_EDIT}p" $BOOK | cut -d ":" -f $i)
+		echo "Old: $FIELD"
+		read -p "New: " NEW_FIELD 
+		sed -i "${NUMBER_OF_LINE_TO_EDIT}s/$FIELD/$NEW_FIELD/" $BOOK
+	done
+	sed -n "${NUMBER_OF_LINE_TO_EDIT}p" $BOOK | column -t -N NAME,PHONE,EMAIL -s ':'
+}
+
+function DeleteContact() {
+	local FILTER
+	local NUMBER_OF_MATCHES
+	local NUMBER_OF_LINE_TO_EDIT
+
+	read -p "FILTER: " FILTER
+	NUMBER_OF_MATCHES=$(grep -ci $FILTER $BOOK)
+
+	if [ $NUMBER_OF_MATCHES -ge 2 ]
+	then
+		grep -ni $FILTER $BOOK | column -t -N ID,NAME,PHONE,EMAIL -s ':'
+		read -p "Select ID of contact: " NUMBER_OF_LINE_TO_EDIT
+	elif [ $NUMBER_OF_MATCHES -eq 1 ]
+	then
+		NUMBER_OF_LINE_TO_EDIT=$(grep -ni $FILTER $BOOK | cut -d ':' -f 1)
+	else
+		echo "No matches found"
+		return 1
+	fi
+	sed -i "${NUMBER_OF_LINE_TO_EDIT}d" $BOOK
+	echo "Contact deleted"
+}
+
+
+### Menu ###
+while [ "${SELECTION}" != "q" ]
+do
+	echo -e "\n\n\n\n"
+	echo "*** Address Book ***"
+	echo "1. List Contacts"
+	echo "2. Search"
+	echo "3. Add"
+	echo "4. Edit"
+	echo "5. Delete"
+	read -p "Action to do?: " SELECTION
+
+
+	case "${SELECTION}" in 
+		1)
+			ListContacts
+			;;
+		2)
+			SearchContacts
+			;;
+		3)
+			AddContact
+			;;
+		4)
+			EditContact
+			;;
+		5)
+			DeleteContact
+			;;
+	esac
+done
